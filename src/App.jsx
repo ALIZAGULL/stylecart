@@ -90,12 +90,10 @@ function App() {
         <label className="searchbox">
           <input
             value={search}
-            onChange={(event) => {
-              setSearch(event.target.value)
-              document.getElementById('collection')?.scrollIntoView({
-                behavior: 'smooth',
-              })
-            }}
+onChange={(event) => {
+  setSearch(event.target.value)
+  setCategory('ALL')
+}}
             placeholder="Search for anything here..."
             aria-label="Search products"
           />
