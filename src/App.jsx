@@ -646,7 +646,7 @@ function App() {
                 <strong>{money(cartTotal)}</strong>
               </div>
               {checkoutError && <p className="form-error" role="alert">{checkoutError}</p>}
-              <button className="place-order" type="submit">PLACE DEMO ORDER</button>
+              <button className="place-order" type="submit">PLACE ORDER</button>
               <button className="text-button" type="button" onClick={() => setCheckoutOpen(false)}>RETURN TO SHOPPING</button>
             </form>
           </section>
@@ -658,9 +658,7 @@ function App() {
           <section className="confirmation-modal" onClick={(event) => event.stopPropagation()} aria-labelledby="confirmation-title">
             <div className="confirmation-check">✓</div>
             <span className="modal-eyebrow">STYLECART</span>
-            <h2 id="confirmation-title">Your demo order is placed!</h2>
-            <p>Thank you, {orderConfirmation.customer.fullName}. Your sample order number is:</p>
-            <strong className="confirmation-order-id">{orderConfirmation.id}</strong>
+<p>Your order has been placed successfully, {orderConfirmation.customer.fullName}. Your order reference is:</p>            <strong className="confirmation-order-id">{orderConfirmation.id}</strong>
             <p className="demo-disclaimer">This is an academic demonstration only. No real order has been sent to a store and no payment has been taken.</p>
             <button className="place-order" onClick={() => setOrderConfirmation(null)}>CONTINUE SHOPPING</button>
           </section>
