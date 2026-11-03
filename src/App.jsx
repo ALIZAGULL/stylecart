@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import './App.css'
+import AdminPanel from './AdminPanel.jsx'
 
-const products = [
+const INITIAL_PRODUCTS = [
   { id: 1, name: 'Girls Cable Knit Jumper', category: 'GIRLS', price: 19.99, image: 'https://images.unsplash.com/photo-1519238263530-99bdd11df2ea?auto=format&fit=crop&w=700&q=85' },
   { id: 2, name: 'Boys Casual Sweatshirt', category: 'BOYS', price: 16.99, image: 'https://images.unsplash.com/photo-1503919005314-30d93d07d823?auto=format&fit=crop&w=700&q=85' },
   { id: 3, name: 'Women Everyday Outfit', category: 'WOMEN', price: 29.99, image: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=700&q=85' },
@@ -17,11 +18,18 @@ const departments = [
   'BABY', 'BEAUTY', 'BRANDS', 'GIFTS', 'CLEARANCE',
 ]
 
+const ADMIN_CREDENTIALS = {
+  username: 'alizay111',
+  password: '12344',
+}
+
 const STORAGE_KEYS = {
   users: 'stylecart_demo_users_v1',
   session: 'stylecart_demo_session_v1',
   cart: 'stylecart_cart_v1',
   orders: 'stylecart_demo_orders_v1',
+  products: 'stylecart_products_v1',
+  adminSession: 'stylecart_admin_session_v1',
 }
 
 const money = (amount) =>
@@ -48,7 +56,6 @@ function createSalt() {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
-// Demo-only password hashing. Real customer authentication must use a server service.
 async function hashPassword(password, saltHex) {
   if (!window.crypto?.subtle) {
     throw new Error('Secure browser support is required. Please open the site using its HTTPS link.')
@@ -75,6 +82,7 @@ function safeUser(user) {
 }
 
 function App() {
+  const [products, setProducts] = useState(() => readStorage(STORAGE_KEYS.products, INITIAL_PRODUCTS))
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('ALL')
   const [cart, setCart] = useState(() => readStorage(STORAGE_KEYS.cart, []))
@@ -103,6 +111,17 @@ function App() {
   })
   const [orderConfirmation, setOrderConfirmation] = useState(null)
 
+  // Admin state
+  const [isAdmin, setIsAdmin] = useState(() => readStorage(STORAGE_KEYS.adminSession, false))
+  const [adminView, setAdminView] = useState(false)
+  const [adminLoginOpen, setAdminLoginOpen] = useState(false)
+  const [adminForm, setAdminForm] = useState({ username: '', password: '' })
+  const [adminLoginError, setAdminLoginError] = useState('')
+
+  useEffect(() => {
+    window.localStorage.setItem(STORAGE_KEYS.products, JSON.stringify(products))
+  }, [products])
+
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEYS.users, JSON.stringify(users))
   }, [users])
@@ -123,6 +142,14 @@ function App() {
     window.localStorage.setItem(STORAGE_KEYS.orders, JSON.stringify(orders))
   }, [orders])
 
+  useEffect(() => {
+    if (isAdmin) {
+      window.localStorage.setItem(STORAGE_KEYS.adminSession, JSON.stringify(true))
+    } else {
+      window.localStorage.removeItem(STORAGE_KEYS.adminSession)
+    }
+  }, [isAdmin])
+
   const visibleProducts = useMemo(() => products.filter((product) => {
     const term = search.trim().toLowerCase()
     const matchesSearch =
@@ -131,7 +158,7 @@ function App() {
       product.category.toLowerCase().includes(term)
     const matchesCategory = category === 'ALL' || product.category === category
     return matchesSearch && matchesCategory
-  }), [search, category])
+  }), [products, search, category])
 
   const addToBag = (product) => {
     setCart((current) => {
@@ -200,6 +227,19 @@ function App() {
         setAuthError('Please enter your email and password.')
         return
       }
+
+      // Check if admin is attempting login through customer sign-in form
+      if (
+        (email === ADMIN_CREDENTIALS.username || email === 'alizay111@stylecart.com') &&
+        password === ADMIN_CREDENTIALS.password
+      ) {
+        setIsAdmin(true)
+        setAccountView(null)
+        setAdminView(true)
+        setMessage('Welcome back, Administrator alizay111!')
+        return
+      }
+
       if (password.length < 6) {
         setAuthError('Password must contain at least 6 characters.')
         return
@@ -326,12 +366,68 @@ function App() {
     setPendingCheckout(false)
   }
 
+  // Admin handlers
+  const handleAdminLogin = (event) => {
+    event.preventDefault()
+    setAdminLoginError('')
+    if (
+      adminForm.username.trim() === ADMIN_CREDENTIALS.username &&
+      adminForm.password === ADMIN_CREDENTIALS.password
+    ) {
+      setIsAdmin(true)
+      setAdminLoginOpen(false)
+      setAdminView(true)
+      setAdminForm({ username: '', password: '' })
+      setMessage('Welcome to the Admin Portal, alizay111!')
+    } else {
+      setAdminLoginError('Invalid admin credentials. Please enter username "alizay111" and password "12344".')
+    }
+  }
+
+  const handleAdminLogout = () => {
+    setIsAdmin(false)
+    setAdminView(false)
+    setMessage('Administrator signed out successfully.')
+  }
+
+  // If Admin View is active, render full Admin Panel
+  if (adminView) {
+    return (
+      <AdminPanel
+        products={products}
+        setProducts={setProducts}
+        orders={orders}
+        setOrders={setOrders}
+        users={users}
+        onClose={() => setAdminView(false)}
+        onLogout={handleAdminLogout}
+        money={money}
+        departments={departments}
+        initialProducts={INITIAL_PRODUCTS}
+      />
+    )
+  }
+
   return (
     <div className="store">
       <div className="topbar">
         <strong>NEXT STYLE</strong>
         <span>Discover the latest fashion and home collection</span>
-        <span>UK COLLECTION · GBP £</span>
+        <div className="topbar-right">
+          <span>UK COLLECTION · GBP £</span>
+          <button
+            className="topbar-admin-btn"
+            onClick={() => {
+              if (isAdmin) {
+                setAdminView(true)
+              } else {
+                setAdminLoginOpen(true)
+              }
+            }}
+          >
+            {isAdmin ? '⚙ ADMIN DASHBOARD' : '🔐 ADMIN PORTAL'}
+          </button>
+        </div>
       </div>
 
       <header className="header">
@@ -438,12 +534,16 @@ function App() {
             {visibleProducts.map((product) => (
               <article className="product" key={product.id}>
                 <div className="product-image">
-<img
-  src={product.image}
-  alt={product.name}
-  loading="eager"
-  referrerPolicy="no-referrer"
-/>                  <button className="add-button" onClick={() => addToBag(product)}>ADD TO BAG +</button>
+                  <img
+                    src={product.image}
+                    alt={product.name}
+                    loading="eager"
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      e.currentTarget.src = 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=700&q=85'
+                    }}
+                  />
+                  <button className="add-button" onClick={() => addToBag(product)}>ADD TO BAG +</button>
                 </div>
                 <p className="product-category">{product.category}</p>
                 <h3>{product.name}</h3>
@@ -562,17 +662,17 @@ function App() {
                     </div>
                   )}
                   <label>
-                    Email address
-                    <input type="email" value={authForm.email} onChange={(event) => setAuthForm((current) => ({ ...current, email: event.target.value }))} autoComplete="email" placeholder="you@example.com" required />
+                    Email address or Username
+                    <input type="text" value={authForm.email} onChange={(event) => setAuthForm((current) => ({ ...current, email: event.target.value }))} autoComplete="email" placeholder="you@example.com (or alizay111 for admin)" required />
                   </label>
                   <label>
                     Password
-                    <input type="password" value={authForm.password} onChange={(event) => setAuthForm((current) => ({ ...current, password: event.target.value }))} autoComplete={authMode === 'login' ? 'current-password' : 'new-password'} minLength={6} placeholder="At least 6 characters" required />
+                    <input type="password" value={authForm.password} onChange={(event) => setAuthForm((current) => ({ ...current, password: event.target.value }))} autoComplete={authMode === 'login' ? 'current-password' : 'new-password'} minLength={5} placeholder="At least 5 characters" required />
                   </label>
                   {authMode === 'signup' && (
                     <label>
                       Confirm password
-                      <input type="password" value={authForm.confirmPassword} onChange={(event) => setAuthForm((current) => ({ ...current, confirmPassword: event.target.value }))} autoComplete="new-password" minLength={6} placeholder="Enter your password again" required />
+                      <input type="password" value={authForm.confirmPassword} onChange={(event) => setAuthForm((current) => ({ ...current, confirmPassword: event.target.value }))} autoComplete="new-password" minLength={5} placeholder="Enter your password again" required />
                     </label>
                   )}
                   {authMode === 'signup' && (
@@ -586,15 +686,86 @@ function App() {
                     {authLoading ? 'PLEASE WAIT...' : authMode === 'login' ? 'SIGN IN' : 'CREATE ACCOUNT'}
                   </button>
                 </form>
+
                 <p className="auth-switch">
                   {authMode === 'login' ? 'New to StyleCart?' : 'Already have an account?'}
                   <button type="button" onClick={() => { setAuthMode(authMode === 'login' ? 'signup' : 'login'); setAuthError('') }}>
                     {authMode === 'login' ? 'Create account' : 'Sign in'}
                   </button>
                 </p>
+
+                <div className="admin-portal-callout">
+                  <span>Store Manager or Staff?</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAccountView(null)
+                      setAdminLoginOpen(true)
+                    }}
+                  >
+                    Open Admin Portal →
+                  </button>
+                </div>
+
                 <p className="demo-disclaimer">Academic project demo: account details and sample orders are stored only in this browser. Do not use a real password or personal customer information.</p>
               </>
             )}
+          </section>
+        </div>
+      )}
+
+      {/* Dedicated Admin Login Modal */}
+      {adminLoginOpen && (
+        <div className="modal-backdrop" onClick={() => setAdminLoginOpen(false)}>
+          <section className="account-modal admin-login-modal" onClick={(event) => event.stopPropagation()} aria-labelledby="admin-title">
+            <button className="modal-close" onClick={() => setAdminLoginOpen(false)} aria-label="Close admin login">×</button>
+            <div className="auth-brandline">
+              <span className="auth-brandmark">NEXT</span>
+              <span className="auth-brand-caption">ADMINISTRATOR CONTROL</span>
+            </div>
+            <span className="modal-eyebrow">RESTRICTED ACCESS</span>
+            <h2 id="admin-title">Admin Portal Sign In</h2>
+            <p className="modal-intro">Enter your administrator credentials to access store analytics, manage customer orders, and update the product catalog.</p>
+
+            <form className="account-form" onSubmit={handleAdminLogin}>
+              <label>
+                Admin Username
+                <input
+                  type="text"
+                  value={adminForm.username}
+                  onChange={(e) => setAdminForm((c) => ({ ...c, username: e.target.value }))}
+                  placeholder="alizay111"
+                  autoComplete="username"
+                  required
+                />
+              </label>
+
+              <label>
+                Admin Password
+                <input
+                  type="password"
+                  value={adminForm.password}
+                  onChange={(e) => setAdminForm((c) => ({ ...c, password: e.target.value }))}
+                  placeholder="•••••"
+                  autoComplete="current-password"
+                  required
+                />
+              </label>
+
+              {adminLoginError && <p className="form-error" role="alert">{adminLoginError}</p>}
+
+              <button className="place-order auth-submit" type="submit">
+                SIGN IN AS ADMIN
+              </button>
+
+              <button
+                type="button"
+                className="demo-autofill-btn"
+                onClick={() => setAdminForm({ username: 'alizay111', password: '12344' })}
+              >
+                Auto-fill credentials (alizay111 / 12344)
+              </button>
+            </form>
           </section>
         </div>
       )}
@@ -658,7 +829,8 @@ function App() {
           <section className="confirmation-modal" onClick={(event) => event.stopPropagation()} aria-labelledby="confirmation-title">
             <div className="confirmation-check">✓</div>
             <span className="modal-eyebrow">STYLECART</span>
-<p>Your order has been placed successfully, {orderConfirmation.customer.fullName}. Your order reference is:</p>            <strong className="confirmation-order-id">{orderConfirmation.id}</strong>
+            <p>Your order has been placed successfully, {orderConfirmation.customer?.fullName}. Your order reference is:</p>
+            <strong className="confirmation-order-id">{orderConfirmation.id}</strong>
             <p className="demo-disclaimer">This is an academic demonstration only. No real order has been sent to a store and no payment has been taken.</p>
             <button className="place-order" onClick={() => setOrderConfirmation(null)}>CONTINUE SHOPPING</button>
           </section>
@@ -669,6 +841,18 @@ function App() {
         <a className="brand" href="#home">NEXT</a>
         <p>Fashion · Home · Everyday essentials</p>
         <p>React.js E-Commerce Academic Project</p>
+        <button
+          className="footer-admin-link"
+          onClick={() => {
+            if (isAdmin) {
+              setAdminView(true)
+            } else {
+              setAdminLoginOpen(true)
+            }
+          }}
+        >
+          {isAdmin ? '⚙ Admin Dashboard (alizay111)' : '🔐 Administrator Portal'}
+        </button>
       </footer>
     </div>
   )
